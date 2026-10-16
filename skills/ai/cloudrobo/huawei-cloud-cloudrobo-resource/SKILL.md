@@ -124,6 +124,12 @@ Returns: `resources` (list of `ResourceVo` with resource_id, resource_name, reso
 resource_sub_type, nodes, config, status, description, usages, pool_type, create_at),
 `page_info`. Pass `resource_id` to `show-pool --pool-id`.
 
+> **Training task `cluster_id`**: `list-pools` is for pool/flavor discovery and does not reliably
+> determine the value to submit. ModelArts `config.cluster_id` may be `None`; do not assume
+> `resource_id` or `config.pool_id` is interchangeable with the task's `cluster_id`. For a training
+> task, copy `cluster_id` from a successful task in the same workspace. The observed SHARED format
+> is `pool-<resource_id>`; do not assume it applies to DEDICATED pools.
+
 #### Show resource pool detail
 
 ```bash

@@ -197,7 +197,12 @@ Ask exactly one question (use a single AskUserQuestion call, NEVER duplicate):
    - Default selection: the flavor matching `constraints.default` (e.g., `default: 2` →
      `"2 * SNT9B2 | 48 vCPUs | 384 GiB"`). User can pick a different valid flavor.
    - `worker_num`: 1 if `host_distributed_mode` is `"singular"`; ask user if `"multiple"`.
-   → select pool → `cluster_id` (with `pool-` prefix). Spec: `Ascend: <n> * <model> | <vCPUs> vCPUs | <GiB> GiB`
+   → select the pool and flavor. Use `list-pools` to identify the pool and inspect its flavors,
+   but do not infer the task's `cluster_id` from `config.cluster_id` or other pool fields. Query a
+   successful task in the same workspace and copy its `cluster_id`. For SHARED pools, the observed
+   format is `pool-<resource_id>`; do not assume this format works for DEDICATED pools. If there is
+   no successful task to reference, ask the user for a known-good `cluster_id` rather than guessing.
+   Spec: `Ascend: <n> * <model> | <vCPUs> vCPUs | <GiB> GiB`
 10. **Output model** — ask save_mode once:
     - `NEW_MODEL`: ask `model_name` + `model_type` in one question; auto-generate `version_name` as
       `"0.0.1"` (user can override). **Do NOT ask each field separately.**
@@ -401,7 +406,8 @@ Construct JSON with:
 - `simple_params`: JSON string (SIMPLE mode only)
 - `rl_config_content`: YAML string (ADVANCED mode only)
 - `spec`: `"ASCEND: <n> * <model> | <vCPUs> vCPUs | <GiB> GiB"`
-- `cluster_id`: pool ID with `pool-` prefix
+- `cluster_id`: copy from a successful task in the same workspace; do not infer it from `list-pools`
+  or assume that the SHARED pool format applies to DEDICATED pools
 - `worker_num`: typically 1
 - `output_models`: from Step 5
 - `enable_jupyter`: `false` for SHARED pool; `true`/`false` for DEDICATED pool
@@ -424,10 +430,11 @@ Construct JSON with:
 
 Scenario: user wants to save a task config without executing immediately, then edit and submit later.
 
-1. **Prepare task config** — only `name` + `workspace_id` required for draft; `algorithm`/`spec`
-   optional
+1. **Prepare task config** — the SDK validates drafts against the same required fields as regular
+   submission. Training requires `name`, `algorithm`, `spec`, `train_mode`, and `workspace_id`;
+   SimRL requires `name`, `workspace_id`, `config_mode`, `spec`, `input_models`, and `output_models`.
 2. **Save draft** — `train save-draft --config '<draft-json>'` (or `--sim-rl` for SimRL draft) →
-   returns `task_id`, task status = `DRAFT`
+   returns `task_id`, task status = `DRAFT` only after the required fields pass local validation
 3. **Later, edit config and resubmit:**
    - **SDK (recommended for draft submit)**: `restart_train_task(task_id, req)` with full TrainTaskDto body — restart endpoint edits and resubmits
    - **CLI**: `train restart-task --task-id <draft-id>` resubmits with existing config; use SDK to pass edited config. For SimRL, `restart-task --sim-rl` resubmits
@@ -537,6 +544,17 @@ cloudrobo train <command> [OPTIONS] [--sim-rl]
 Training mode (fine-tuning `MODEL_TUNING` vs pre-training `TRAIN_FROM_SCRATCH`), method
 (FFT/SFT/LORA/QLORA/DEEPSPEED), base model, dataset, and spec are all expressed through the
 `--config` JSON body — there are no dedicated `finetune`/`pretrain` subcommands.
+
+Regular training tasks must include `checkpoint_max_keep` and `output_retention_days`.
+
+#### Commonly Confused Config Fields
+
+| Scenario | Correct form | Common mistake |
+| -------- | ------------ | -------------- |
+| Gallery preset dataset | `source_type: "PUBLIC_DATASET_ASSET"` | Using `CUSTOM_DATASET_ASSET` (for Workspace datasets) |
+| `algorithm` for MODEL_TUNING with a Gallery model | Only `algorithm_asset_id` + `algorithm_version_id`, taken from the model action | Adding `algorithm_source_type` or custom algorithm fields; these do not apply to this Gallery MODEL_TUNING path |
+| `input_models` | Include `source_type`, `model_asset_id`, `version_id`, `model_name`, and `version_name` | Sending only asset/version IDs |
+| Training `spec` | Use a flavor from the selected pool, e.g. `Ascend: 1 * SNT9B2 \| 24 vCPUs \| 192 GiB` | Reusing old `Ascend-910B`/`Ascend-910A` examples or choosing a flavor not offered by the pool |
 
 #### Submit a fine-tuning task (MODEL_TUNING)
 
@@ -718,7 +736,7 @@ print "（无）" for empty env. For `restart-task --verbose`: show task_id + ch
 | Array size limits | `datasets`, `input_models`, `output_models` — max 1 item each                                                                                                                                                                                            |
 | `parameters` format | JSON string; each item: `key`+`desc`+`value`+`constraint`; pass ALL hyperparams                                                                                                                                                                          |
 | `env` format | JSON string; pass `"[]"` if no custom env vars                                                                                                                                                                                                           |
-| `cluster_id` | Pool ID with `pool-` prefix (e.g., `pool-6872b4ac-...`); SHARED or DEDICATED pool type. SHARED pools require the full `pool_id` (starts with `pool-`); DEDICATED pools use the cluster_id directly. Using DEDICATED pool requires asset read permissions |
+| `cluster_id` | Copy from a successful task in the same workspace. `list-pools` identifies pools but does not reliably determine the task value: ModelArts `config.cluster_id` may be `None`, and DEDICATED pool formats are not inferred. SHARED format observed: `pool-<resource_id>` |
 | Task status | `status` 10 values: CREATING/RUNNING/FAILED/WAITING/DRAFT/FINISHED/STOPPING/DELETING/ABNORMAL; `detail_status` 15 values (adds CREATE_FAILED/RUN_FAILED/STOP_FAILED/NOT_EXIST/UNKNONW); terminal status: FINISHED/FAILED/STOPPED/ABNORMAL                |
 | Task deletion | Irreversible. CLI `delete-tasks --task-id <id>` auto-resolves `execution_id` from task_id for regular training tasks; no manual lookup needed                                                                                                            |
 | Algorithm info | Dynamically fetched from `ext_metadata`; do not hardcode asset_ids                                                                                                                                                                                       |
