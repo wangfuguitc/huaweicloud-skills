@@ -545,7 +545,9 @@ Training mode (fine-tuning `MODEL_TUNING` vs pre-training `TRAIN_FROM_SCRATCH`),
 (FFT/SFT/LORA/QLORA/DEEPSPEED), base model, dataset, and spec are all expressed through the
 `--config` JSON body — there are no dedicated `finetune`/`pretrain` subcommands.
 
-Regular training tasks must include `checkpoint_max_keep` and `output_retention_days`.
+For regular training tasks, the SDK defaults `checkpoint_max_keep` to `10` (maximum `50`) and
+`output_retention_days` to `14` (maximum `9999`) when omitted. You can provide either field to
+override its default.
 
 #### Commonly Confused Config Fields
 

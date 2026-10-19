@@ -2,7 +2,7 @@
 
 ## TrainTaskDto (create training task request body)
 
-Required fields: `name`, `algorithm`, `spec`, `workspace_id`,
+Required fields after SDK defaults: `name`, `algorithm`, `spec`, `workspace_id`,
 `checkpoint_max_keep`, `output_retention_days`
 
 | Field | Type | Required | Description | Example |
@@ -26,8 +26,8 @@ Required fields: `name`, `algorithm`, `spec`, `workspace_id`,
 | `inputs` | array[IOConfig] | No | Input config (max 10, for workspace models) | `[{"name":"input-model",...}]` |
 | `outputs` | array[IOConfig] | No | Output config (max 5, for workspace models) | `[{"name":"output-model",...}]` |
 | `log_path` | string | No | OBS path for training logs (optional, can be omitted) | `"obs://bucket/train-logs/<task-name>/"` |
-| `checkpoint_max_keep` | — | Yes | Maximum number of checkpoints to retain | — |
-| `output_retention_days` | — | Yes | Number of days to retain task outputs | — |
+| `checkpoint_max_keep` | integer | Yes (SDK default: 10) | Maximum number of checkpoints to retain (max 50) | `10` |
+| `output_retention_days` | integer | Yes (SDK default: 14) | Number of days to retain intermediate outputs (max 9999) | `14` |
 | `enable_jupyter` | boolean | No | Enable JupyterLab access during training (optional, **DEDICATED pools only** — SHARED/public pools do not support JupyterLab) | `true` |
 
 ## IOConfig fields (for workspace model and custom algorithm scenarios)
